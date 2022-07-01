@@ -1,0 +1,7 @@
+dataset/
+snapshot/
+model/
+VOCdevkit/
+output/
+temp/
+log/
