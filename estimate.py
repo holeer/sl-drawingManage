@@ -60,10 +60,10 @@ def find_all_tag(input):
 
 def Precision(pre_output, true_output):
     """
-    计算准确率
+    计算精确度
     :param pre_output:  预测输出
     :param true_output:  真实输出
-    :return: 准确率
+    :return: 精确度
     """
     pre = []
     pre_result = find_all_tag(pre_output)

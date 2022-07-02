@@ -1,15 +1,9 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Time    : 2021/5/3 16:54
-# @Author  : JJkinging
-# @File    : BERT_BiLSTM_CRF.py
-
 import torch.nn as nn
 import torch
 from transformers import BertModel
 from torchcrf import CRF
 import torchvision.models as models
-from config.config import config
+from attention import SelfAttention, MultiHeadSelfAttention, Attention_Layer
 
 
 class BERT_BiLSTM_CRF(nn.Module):
@@ -36,15 +30,18 @@ class BERT_BiLSTM_CRF(nn.Module):
         self.word_embeds = BertModel.from_pretrained(pretrain_model_name)
         for param in self.word_embeds.parameters():
             param.requires_grad = True
-        self.LSTM = nn.LSTM(self.embedding_dim,
-                            self.hidden_dim,
+        self.LSTM = nn.LSTM(input_size=self.embedding_dim,
+                            hidden_size=self.hidden_dim,
                             num_layers=self.rnn_layers,
                             bidirectional=True,
                             batch_first=True)
         self._dropout = nn.Dropout(p=self.dropout)
         self.CRF = CRF(num_tags=self.tag_set_size, batch_first=True)
-        self.Liner = nn.Linear(self.hidden_dim*2, self.tag_set_size)
-        self.Liner2 = nn.Linear(768 * 2 + 4, 768)
+        self.Liner = nn.Linear(self.hidden_dim * 2, self.tag_set_size)
+        self.mix_embedding = nn.Linear(self.embedding_dim * 2, self.embedding_dim)
+        # self.attn = SelfAttention(self.embedding_dim * 2, config.max_length, self.embedding_dim)
+        # self.attn = MultiHeadSelfAttention(self.hidden_dim * 2, self.hidden_dim * 2, self.hidden_dim * 2)
+        # self.attn = Attention_Layer(self.hidden_dim, True)
 
     def _init_hidden(self, batch_size):
         """
@@ -54,26 +51,25 @@ class BERT_BiLSTM_CRF(nn.Module):
                 torch.randn(2*self.rnn_layers, batch_size, self.hidden_dim).to(self.device))
 
     def forward(self, sentence, attention_mask=None, positions=None, pics=None):
-        '''
-        :param sentence: sentence (batch_size, max_seq_len) : word-level representation of sentence
-        :param attention_mask:
-        :param positions:
-        :param pics:
-        :return: List of list containing the best tag sequence for each batch.
-        '''
         batch_size = sentence.size(0)
         seq_length = sentence.size(1)
         # embeds: [batch_size, max_seq_length, embedding_dim]
         embeds = self.word_embeds(sentence, attention_mask=attention_mask)[0]
         mix = torch.cat((embeds, pics), 2)
-        mix = torch.cat((mix, positions), 2)
-        text_pic_feature = self.Liner2(mix)
-        # print(text_pic_feature.size())
-        hidden = self._init_hidden(batch_size)
+        # mix = torch.cat((mix, positions), 2)
+        text_pic_feature = self.mix_embedding(mix)
 
-        # lstm_out: [batch_size, max_seq_length, hidden_dim*2]
+        # hidden = self._init_hidden(batch_size)
+        # lstm_out, hidden = self.LSTM(text_pic_feature, hidden)
+        # attn_out = self.attn(lstm_out, attention_mask)
+        # attn_out = attn_out.contiguous().view(-1, self.hidden_dim * 2)
+        # d_attn_out = self._dropout(attn_out)
+        # l_out = self.Liner(d_attn_out)
+        # lstm_feats = l_out.contiguous().view(batch_size, seq_length, -1)
+
+        hidden = self._init_hidden(batch_size)
         lstm_out, hidden = self.LSTM(text_pic_feature, hidden)
-        lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim*2)
+        lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim * 2)
         d_lstm_out = self._dropout(lstm_out)
         l_out = self.Liner(d_lstm_out)
         lstm_feats = l_out.contiguous().view(batch_size, seq_length, -1)

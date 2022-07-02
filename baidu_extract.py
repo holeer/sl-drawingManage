@@ -153,7 +153,6 @@ def extract(file_path):
         print('*' * 30 + '开始OCR识别' + '*' * 30)
         for i in tqdm(img_list):
             ocr_dict, texts, locations = extract_img(token, config.img_path + i)
-
             content = ''.join(texts).replace(' ', '')
             label = predict.get_label(config.img_path + i, content) if len(content) > 0 else []
             ocr_dict['label'] = label

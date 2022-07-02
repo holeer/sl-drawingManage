@@ -9,8 +9,11 @@ import torchvision.models as models
 from torch.autograd import Variable
 from transformers import BertTokenizer, BertModel
 from PIL import Image
+import baidu_extract
+from api_call import baidu_api
 
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 transform_list = [transforms.ToTensor(),
                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                        std=[0.229, 0.224, 0.225])]
@@ -18,7 +21,7 @@ img_to_tensor = transforms.Compose(transform_list)
 
 bert_tokenizer = BertTokenizer.from_pretrained("model/bert-base-chinese/")
 bert_model = BertModel.from_pretrained("model/bert-base-chinese/")
-res_model = models.resnet101(pretrained=True)
+res_model = models.resnet101(pretrained=True).to(device)
 
 
 class Entity_predict:
@@ -60,8 +63,8 @@ class Entity_predict:
             input_list.append(input_seq[i])
 
         if len(input_list) > max_length - 2:
-            input_list = input_list[-(max_length - 2):0]
-            position = position[-(max_length - 2):0]
+            input_list = input_list[-(max_length - 2):]
+            position = position[-(max_length - 2):]
         input_list = ['[CLS]'] + input_list + ['[SEP]']
         input_ids = [int(self.vocab[word]) if word in self.vocab else int(self.vocab['[UNK]']) for word in input_list]
         input_mask = [1] * len(input_ids)
@@ -79,21 +82,21 @@ class Entity_predict:
         # 变为tensor并放到GPU上, 二维, 这里mask在CRF中必须为unit8类型或者bool类型
         input_ids = torch.LongTensor([input_ids]).to(self.device)
         input_mask = torch.ByteTensor([input_mask]).to(self.device)
-        input_position = torch.LongTensor([position]).to(self.device)
+        input_position = torch.FloatTensor([position]).to(self.device)
 
         # 提取图像特征
-        res_model.fc = torch.nn.Linear(2048, 768)
+        res_model.fc = torch.nn.Linear(2048, config.bert_embedding)
         res_model.eval()
         img = Image.open(pic_path)
         img = img.resize((224, 224))
-        pic = img_to_tensor(img).resize_(1, 3, 224, 224)
-        pic_output = res_model(Variable(pic))
+        pic = img_to_tensor(img).resize_(1, 3, 224, 224).to(self.device)
+        pic_output = res_model(Variable(pic).to(self.device)).to(self.device)
         output_npy = pic_output.data.cpu().numpy()[0]
         pic_feature = []
         for i in range(max_length):
             pic_feature.append(output_npy)
 
-        input_pic = torch.LongTensor([pic_feature]).to(self.device)
+        input_pic = torch.FloatTensor([pic_feature]).to(self.device)
 
         feats = self.model(input_ids, input_mask, input_position, input_pic)
         # out_path是一条预测路径（数字列表）, [1:-1]表示去掉一头一尾, <START>和<EOS>标志
@@ -109,6 +112,8 @@ class Entity_predict:
 
 
 getEntity = Entity_predict()
-res = getEntity.predict('test.png', "广B立面广c广90-61028M桥梁全长：36410第三联)430的0-12000预应力凝士（后张）侉支查连续T梁410430003000410160型仲笔缝0饰1115右侧地面线1601602B112)层理产：318°1491203z99中桩地面线112.中风化无质教岩715.7715.9平面改路4.5颜Z14+863政河B-22m天目溪桥梁中心格男建德人建德二接0版道改路1h4.5屋浙江省交通规划设计研究院有限公司临金高速公路临安至建德段工程於潜北互通(互通段)右线杭州市交通规划设计研究院第1标段设计曹林复核唐翔网审核朱突勤丸图号2017GL030373S6-5-4-2-3",
-                        [])
+token = baidu_api.fetch_token()
+drawing_dict, texts, locations = baidu_extract.extract_img(token, 'test.png')
+content = ''.join(texts).replace(' ', '')
+res = getEntity.predict('test.png', content, [])
 print(res)

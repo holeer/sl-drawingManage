@@ -21,9 +21,7 @@ class Config(object):
         self.base_size = 3840
         # model config
         self.max_length = 512
-        self.use_cuda = True
-        self.gpu = 0
-        self.batch_size = 1
+        self.batch_size = 4
         self.shuffle = True
         self.rnn_hidden = 128
         self.bert_embedding = 768
@@ -32,11 +30,12 @@ class Config(object):
         self.lr = 0.0001
         self.lr_decay = 0.00001
         self.weight_decay = 0.00005
-        # self.checkpoint = 'output/RoBERTa_best.pth.tar'
+        # self.checkpoint = 'best/RoBERTa_best.pth.tar'
         self.checkpoint = None
         self.epochs = 20
         self.max_grad_norm = 10
-        self.patience = 5
+        self.patience = 10
+        self.seed = 42
 
     def update(self, **kwargs):
         for k, v in kwargs.items():

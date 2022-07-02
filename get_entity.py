@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# author： LiuXG
-# datetime： 2021/9/14 16:39 
-# ide： PyCharm
 
 tags = [(1, 2), (3, 4), (5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16)]
 label_O = 17

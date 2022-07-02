@@ -18,6 +18,7 @@ import torchvision.models as models
 from torch.autograd import Variable
 from transformers import BertTokenizer, BertModel
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 transform_list = [transforms.ToTensor(),
                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                        std=[0.229, 0.224, 0.225])]
@@ -25,8 +26,8 @@ img_to_tensor = transforms.Compose(transform_list)
 
 bert_tokenizer = BertTokenizer.from_pretrained("model/bert-base-chinese/")
 bert_model = BertModel.from_pretrained("model/bert-base-chinese/")
-res_model = models.resnet101(pretrained=True)
-res_model.fc = torch.nn.Linear(2048, config.bert_embedding)
+res_model = models.resnet101(pretrained=True).to(device)
+res_model.fc = torch.nn.Linear(2048, config.bert_embedding).to(device)
 res_model.eval()
 
 
@@ -316,11 +317,21 @@ def load_vocab(vocab_file):
 
 def get_area_feature(img, positions):
     pic_feature = []
-    for i in positions:
-        if [0, 0, 0, 0] == i or [-1, -1, -1, -1] == i or [1, 1, 1, 1] == i:
-            pic_feature.append(torch.zeros(config.bert_embedding, dtype=torch.float))
+    width, height = img.size
+    zero_npy = np.zeros((config.bert_embedding, ), dtype=float)
+    last_box = ()
+    last_npy = np.zeros((config.bert_embedding, ), dtype=float)
+    for index, i in enumerate(positions):
+        if [0, 0, 0, 0] == i or [1, 1, 1, 1] == i:
+            # temp = img.resize((224, 224))
+            # pic = img_to_tensor(temp).resize_(1, 3, 224, 224)
+            # pic_output = res_model(Variable(pic))
+            # output_npy = pic_output.data.cpu().numpy()[0]
+            # pic_feature.append(output_npy)
+            pic_feature.append(zero_npy)
+        elif [-1, -1, -1, -1] == i:
+            pic_feature.append(zero_npy)
         else:
-            width, height = img.size
             area_width = width * i[2]
             area_height = height * i[3]
             x_min = (width * i[0]) - (area_width / 2)
@@ -328,12 +339,17 @@ def get_area_feature(img, positions):
             x_max = x_min + area_width
             y_max = y_min + area_height
             box = (x_min, y_min, x_max, y_max)
-            region = img.crop(box)
-            region = region.resize((224, 224))
-            pic = img_to_tensor(region).resize_(1, 3, 224, 224)
-            pic_output = res_model(Variable(pic))
-            output_npy = pic_output.data.cpu().numpy()[0]
-            pic_feature.append(output_npy)
+            if box != last_box:
+                last_box = box
+                region = img.crop(box)
+                region = region.resize((224, 224))
+                pic = img_to_tensor(region).resize_(1, 3, 224, 224).to(device)
+                pic_output = res_model(Variable(pic).to(device)).to(device)
+                output_npy = pic_output.data.cpu().numpy()[0]
+                last_npy = output_npy
+                pic_feature.append(output_npy)
+            else:
+                pic_feature.append(last_npy)
     return pic_feature
 
 
@@ -341,7 +357,6 @@ def read_dataset(path, max_length, label_dic, vocab):
     data_list = os.listdir(path + 'txt/')
     data_list.sort(key=lambda x: int(x.split('.')[0]))
     result = []
-    print('*' * 30 + '加载数据集' + '*' * 30)
     for data in tqdm(data_list):
         with open(path + 'txt/' + data, 'r', encoding='utf-8') as fp:
             words = []
@@ -363,9 +378,9 @@ def read_dataset(path, max_length, label_dic, vocab):
                 positions.append(position_list)
             if len(words) > 0:
                 if len(words) > max_length - 2:
-                    words = words[-(max_length - 2):0]
-                    labels = labels[-(max_length - 2):0]
-                    positions = positions[-(max_length - 2):0]
+                    words = words[-(max_length - 2):]
+                    labels = labels[-(max_length - 2):]
+                    positions = positions[-(max_length - 2):]
                 words = ['[CLS]'] + words + ['[SEP]']
                 labels = ['<START>'] + labels + ['<EOS>']
                 positions.insert(0, [0, 0, 0, 0])
@@ -387,14 +402,19 @@ def read_dataset(path, max_length, label_dic, vocab):
 
                 # 提取图像特征
                 img = Image.open(path + 'img/' + str(data.split('.')[0]) + '.png')
-                pic_feature = get_area_feature(img, positions)
-                # img = img.resize((224, 224))
-                # pic = img_to_tensor(img).resize_(1, 3, 224, 224)
-                # pic_output = res_model(Variable(pic))
-                # output_npy = pic_output.data.cpu().numpy()[0]
-                # pic_feature = []
-                # for i in range(max_length):
-                #     pic_feature.append(output_npy)
+                # pic_feature = get_area_feature(img, positions)
+                img = img.resize((224, 224))
+                pic = img_to_tensor(img).resize_(1, 3, 224, 224).to(device)
+                pic_output = res_model(Variable(pic).to(device)).to(device)
+                output_npy = pic_output.data.cpu().numpy()[0]
+                pic_feature = []
+                zero_npy = np.zeros((config.bert_embedding,), dtype=float)
+                for i in input_ids:
+                    # if i == 0 or i == int(vocab['[CLS]']) or i == int(vocab['[SEP]']):
+                    if i == 0:
+                        pic_feature.append(zero_npy)
+                    else:
+                        pic_feature.append(output_npy)
 
                 features = InputFeature(input_id=input_ids, label_id=label_ids, input_mask=input_mask,
                                         position=positions, pic_feature=pic_feature)
@@ -448,6 +468,56 @@ def make_voc_dataset():
         print('val.txt done')
 
 
+def read_log(path):
+    for line in open(path, "r", encoding='utf-8'):
+        print(line)
 
-# if __name__ == '__main__':
-#     make_voc_dataset()
+
+def read_dataset_prompt(path, max_length):
+    data_list = os.listdir(path + 'txt/')
+    data_list.sort(key=lambda x: int(x.split('.')[0]))
+    print('*' * 30 + '加载数据集' + '*' * 30)
+    texts = []
+    labels = []
+    for data in tqdm(data_list):
+        with open(path + 'txt/' + data, 'r', encoding='utf-8') as fp:
+            words = []
+            drawing = []
+            project = []
+            design = []
+            check = []
+            recheck = []
+            sheet = []
+            num = []
+            sketch = []
+            for line in fp:
+                contents = line.strip()
+                tokens = contents.split(' ')
+                words.append(tokens[0])
+                if 'drawing' in tokens[1]:
+                    drawing.append(tokens[0])
+                if 'project' in tokens[1]:
+                    project.append(tokens[0])
+                if 'design' in tokens[1]:
+                    design.append(tokens[0])
+                if 'check' in tokens[1]:
+                    check.append(tokens[0])
+                if 'recheck' in tokens[1]:
+                    recheck.append(tokens[0])
+                if 'sheet' in tokens[1]:
+                    sheet.append(tokens[0])
+                if 'num' in tokens[1]:
+                    num.append(tokens[0])
+                if 'sketch' in tokens[1]:
+                    sketch.append(tokens[0])
+
+            content = ''.join(words)
+            # prompt
+            text = content + '。上文中，项目是' + '[MASK]'*len(project) + '，图名是' + '[MASK]'*len(drawing) + '，设计是' + '[MASK]'*len(design) + '，复核是' + '[MASK]'*len(recheck) + '，审核是' + '[MASK]'*len(check) + '，图号是' + '[MASK]'*len(num) + '，表格是' + '[MASK]'*len(sheet) + '，图示是' + '[MASK]'*len(sketch)
+            label = content + '。上文中，项目是' + ''.join(project) + '，图名是' + ''.join(drawing) + '，设计是' + ''.join(design) + '，复核是' + ''.join(recheck) + '，审核是' + ''.join(check) + '，图号是' + ''.join(num) + '，表格是' + ''.join(sheet) + '，图示是' + ''.join(sketch)
+            if len(content) > max_length:
+                content = content[-(max_length - 2):]
+                label = label[-(max_length - 2):]
+            texts.append(text)
+            labels.append(label)
+    return texts, labels
