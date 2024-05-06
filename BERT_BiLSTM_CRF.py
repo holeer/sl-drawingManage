@@ -55,9 +55,9 @@ class BERT_BiLSTM_CRF(nn.Module):
         seq_length = sentence.size(1)
         # embeds: [batch_size, max_seq_length, embedding_dim]
         embeds = self.word_embeds(sentence, attention_mask=attention_mask)[0]
-        mix = torch.cat((embeds, pics), 2)
+        # mix = torch.cat((embeds, pics), 2)
         # mix = torch.cat((mix, positions), 2)
-        text_pic_feature = self.mix_embedding(mix)
+        # text_pic_feature = self.mix_embedding(mix)
 
         # hidden = self._init_hidden(batch_size)
         # lstm_out, hidden = self.LSTM(text_pic_feature, hidden)
@@ -68,7 +68,7 @@ class BERT_BiLSTM_CRF(nn.Module):
         # lstm_feats = l_out.contiguous().view(batch_size, seq_length, -1)
 
         hidden = self._init_hidden(batch_size)
-        lstm_out, hidden = self.LSTM(text_pic_feature, hidden)
+        lstm_out, hidden = self.LSTM(embeds, hidden)
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim * 2)
         d_lstm_out = self._dropout(lstm_out)
         l_out = self.Liner(d_lstm_out)

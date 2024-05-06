@@ -7,8 +7,8 @@ import jieba.posseg as pseg
 import utils
 import difflib
 import re
-from PyPDF2 import PdfFileReader, PdfFileWriter
-import fitz
+# from PyPDF2 import PdfFileReader, PdfFileWriter
+# import fitz
 from tqdm import tqdm
 import os
 import predict
@@ -103,61 +103,61 @@ def extract_img(token, img_path):
         return drawing_dict, [], []
 
 
-def extract(file_path):
-    token = baidu_api.fetch_token()
-    result_list = []
+# def extract(file_path):
+#     token = baidu_api.fetch_token()
+#     result_list = []
 
-    file_name = file_path.split(config.temp_path)[1]
+#     file_name = file_path.split(config.temp_path)[1]
 
-    utils.init_dirs(config.pdf_path)
-    utils.init_dirs(config.img_path)
-    utils.init_dirs(config.txt_path)
+#     utils.init_dirs(config.pdf_path)
+#     utils.init_dirs(config.img_path)
+#     utils.init_dirs(config.txt_path)
 
-    if file_path.split('.')[1] == 'png':
-        print('*' * 30 + '开始OCR识别' + '*' * 30)
-        utils.resize_pic(file_path, config.base_size)
-        ocr_dict, texts, locations = extract_img(token, file_path)
-        print('*' * 30 + '开始预测图纸标签' + '*' * 30)
-        content = ''.join(texts).replace(' ', '')
-        label = predict.get_label(file_path, content)
-        ocr_dict['label'] = label
-        ocr_dict['file_name'] = file_name
-        result_list.append(ocr_dict)
-    elif file_path.split('.')[1] == 'pdf':
-        print("*" * 30 + "开始拆分PDF" + "*" * 30)
-        file_reader = PdfFileReader(file_path)
-        total_pages = file_reader.getNumPages()
-        for page in tqdm(range(total_pages)):
-            # 实例化对象
-            file_writer = PdfFileWriter()
-            # 将遍历的每一页添加到实例化对象中
-            file_writer.addPage(file_reader.getPage(page))
-            with open("pdf/{}.pdf".format(page), 'wb') as out:
-                file_writer.write(out)
+#     if file_path.split('.')[1] == 'png':
+#         print('*' * 30 + '开始OCR识别' + '*' * 30)
+#         utils.resize_pic(file_path, config.base_size)
+#         ocr_dict, texts, locations = extract_img(token, file_path)
+#         print('*' * 30 + '开始预测图纸标签' + '*' * 30)
+#         content = ''.join(texts).replace(' ', '')
+#         label = predict.get_label(file_path, content)
+#         ocr_dict['label'] = label
+#         ocr_dict['file_name'] = file_name
+#         result_list.append(ocr_dict)
+    # elif file_path.split('.')[1] == 'pdf':
+    #     print("*" * 30 + "开始拆分PDF" + "*" * 30)
+    #     file_reader = PdfFileReader(file_path)
+    #     total_pages = file_reader.getNumPages()
+    #     for page in tqdm(range(total_pages)):
+    #         # 实例化对象
+    #         file_writer = PdfFileWriter()
+    #         # 将遍历的每一页添加到实例化对象中
+    #         file_writer.addPage(file_reader.getPage(page))
+    #         with open("pdf/{}.pdf".format(page), 'wb') as out:
+    #             file_writer.write(out)
 
-        pdf_list = os.listdir(config.pdf_path)
-        pdf_list.sort(key=lambda x: int(x.split('.')[0]))
-        print("*" * 30 + "开始转换图片" + "*" * 30)
-        for p in tqdm(pdf_list):
-            pdf = fitz.open(config.pdf_path + p)
-            page = pdf[0]
-            trans = fitz.Matrix(4, 4).prerotate(0)
-            pm = page.get_pixmap(matrix=trans, alpha=False)
-            # 开始写图像
-            pm.save(config.img_path + p.split(".")[0] + ".png")
-            utils.resize_pic(config.img_path + p.split(".")[0] + ".png", config.base_size)
-            pdf.close()
+    #     pdf_list = os.listdir(config.pdf_path)
+    #     pdf_list.sort(key=lambda x: int(x.split('.')[0]))
+    #     print("*" * 30 + "开始转换图片" + "*" * 30)
+    #     for p in tqdm(pdf_list):
+    #         pdf = fitz.open(config.pdf_path + p)
+    #         page = pdf[0]
+    #         trans = fitz.Matrix(4, 4).prerotate(0)
+    #         pm = page.get_pixmap(matrix=trans, alpha=False)
+    #         # 开始写图像
+    #         pm.save(config.img_path + p.split(".")[0] + ".png")
+    #         utils.resize_pic(config.img_path + p.split(".")[0] + ".png", config.base_size)
+    #         pdf.close()
 
-        img_list = os.listdir(config.img_path)
-        img_list.sort(key=lambda x: int(x.split('.')[0]))
-        print('*' * 30 + '开始OCR识别' + '*' * 30)
-        for i in tqdm(img_list):
-            ocr_dict, texts, locations = extract_img(token, config.img_path + i)
-            content = ''.join(texts).replace(' ', '')
-            label = predict.get_label(config.img_path + i, content) if len(content) > 0 else []
-            ocr_dict['label'] = label
-            ocr_dict['file_name'] = file_name
-            result_list.append(ocr_dict)
+    #     img_list = os.listdir(config.img_path)
+    #     img_list.sort(key=lambda x: int(x.split('.')[0]))
+    #     print('*' * 30 + '开始OCR识别' + '*' * 30)
+    #     for i in tqdm(img_list):
+    #         ocr_dict, texts, locations = extract_img(token, config.img_path + i)
+    #         content = ''.join(texts).replace(' ', '')
+    #         label = predict.get_label(config.img_path + i, content) if len(content) > 0 else []
+    #         ocr_dict['label'] = label
+    #         ocr_dict['file_name'] = file_name
+    #         result_list.append(ocr_dict)
 
         # utils.save_json_file(result_list, 'result.json')
     return result_list

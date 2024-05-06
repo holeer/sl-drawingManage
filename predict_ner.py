@@ -78,7 +78,7 @@ class Entity_predict:
                 position.append([0, 0, 0, 0])
         assert len(input_ids) == max_length
         assert len(input_mask) == max_length
-        assert len(position) == max_length
+        # assert len(position) == max_length
         # 变为tensor并放到GPU上, 二维, 这里mask在CRF中必须为unit8类型或者bool类型
         input_ids = torch.LongTensor([input_ids]).to(self.device)
         input_mask = torch.ByteTensor([input_mask]).to(self.device)
@@ -113,7 +113,7 @@ class Entity_predict:
 
 getEntity = Entity_predict()
 token = baidu_api.fetch_token()
-drawing_dict, texts, locations = baidu_extract.extract_img(token, 'test.png')
+drawing_dict, texts, locations = baidu_extract.extract_img(token, '1033.png')
 content = ''.join(texts).replace(' ', '')
-res = getEntity.predict('test.png', content, [])
+res = getEntity.predict('1033.png', content, [])
 print(res)

@@ -30,8 +30,8 @@ class Config(object):
         self.lr = 0.0001
         self.lr_decay = 0.00001
         self.weight_decay = 0.00005
-        # self.checkpoint = 'best/RoBERTa_best.pth.tar'
-        self.checkpoint = None
+        self.checkpoint = 'output/RoBERTa_best.pth.tar'
+        # self.checkpoint = None
         self.epochs = 20
         self.max_grad_norm = 10
         self.patience = 10

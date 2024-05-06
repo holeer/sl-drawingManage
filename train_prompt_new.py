@@ -11,11 +11,12 @@ from config.config import config
 
 
 # 定义模型
+# checkpoint = "model/RoBERTa_zh_L12_PyTorch"
 checkpoint = "model/bert-base-chinese"
 tokenizer = BertTokenizerFast.from_pretrained(checkpoint)
 bert_config = BertConfig.from_pretrained(checkpoint)
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 
 class BERTModel(torch.nn.Module):
@@ -70,7 +71,6 @@ def create_dataset(text, label, tokenizer, max_len):
     train_dataset = MyDataSet(input_ids, attention_masks, token_type_ids, label_ids)
     input_ids, attention_masks, token_type_ids, label_ids = preprocess_function(test_dataset)
     test_dataset = MyDataSet(input_ids, attention_masks, token_type_ids, label_ids)
-    # test_dataset = test_dataset.map(preprocess_function, batched=True)
     return train_dataset, test_dataset
 
 
@@ -97,18 +97,29 @@ def train(net, train_iter, test_iter, lr, weight_decay, num_epochs):
             optimizer.step()
             schedule.step()
             loss_sum += l.item()
-            if (idx + 1) % 1 == 0:
+            if (idx + 1) % 100 == 0:
                 print("Epoch {:04d} | Step {:06d}/{:06d} | Loss {:.4f} | Time {:.0f}".format(
                     epoch + 1, idx + 1, len(train_iter), loss_sum / (idx + 1), time.time() - start_of_epoch)
                 )
-            print(out_train.view(-1, tokenizer.vocab_size).size())
-            print(att_mask)
-            print(y)
-            predicted = torch.max(out_train, att_mask)[1]
-            cor += (predicted == y).sum()
-            cor = float(cor)
+            batch_size, max_size = y.size()
+            
+            for id in ids:
+                b = torch.nonzero(id==103).squeeze()
+                predicted = torch.max(out_train.view(batch_size, max_size, -1), 2)[1]
+                predicted_npy = predicted.cpu().detach().numpy()
+                label_npy = y
+                mask_npy = b.cpu().detach().numpy()
+                for i in c:
 
-        acc = float(cor / train_iter)
+                print(b)
+
+
+            predicted = torch.max(out_train.view(batch_size, max_size, -1), 2)[1]
+            cor += (predicted == y).sum() / (max_size * batch_size)
+            cor = float(cor)
+            # print(cor)
+
+        acc = float(cor / len(train_iter))
 
         eval_loss_sum = 0.0
         net.eval()
@@ -119,14 +130,15 @@ def train(net, train_iter, test_iter, lr, weight_decay, num_epochs):
                 out_test = net(ids, att, tpe)
                 loss_eval = loss(out_test.view(-1, tokenizer.vocab_size), y.view(-1))
                 eval_loss_sum += loss_eval.item()
-                predicted_test = torch.max(att_mask, 1)[1]
-                correct_test += (predicted_test == y).sum()
+                batch_size, max_size = y.size()
+                predicted_test = torch.max(out_test.view(batch_size, max_size, -1), 2)[1]
+                correct_test += (predicted_test == y).sum() / (max_size * batch_size)
                 correct_test = float(correct_test)
-        acc_test = float(correct_test / test_iter)
+        acc_test = float(correct_test / len(test_iter))
 
         if epoch % 1 == 0:
-            print(("epoch {}, train_loss {},  train_acc {} , eval_loss {} ,acc_test {}".format(
-                epoch + 1, loss_sum / (len(train_iter)), acc, eval_loss_sum / (len(test_iter)), acc_test))
+            print(("epoch {}, train_loss {:.4f},  train_acc {:.4f} , eval_loss {:.4f} ,acc_test {:.4f}".format(
+                epoch + 1, loss_sum / (len(train_iter)), acc * 100, eval_loss_sum / (len(test_iter)), acc_test * 100))
             )
             train_loss.append(loss_sum / len(train_iter))
             eval_loss.append(eval_loss_sum / len(test_iter))
@@ -147,8 +159,8 @@ if __name__ == '__main__':
 
     text, label = read_dataset_prompt(config.train_file, config.max_length)
     train_dataset, test_dataset = create_dataset(text, label, tokenizer, config.max_length)
-    train_iter = DataLoader(train_dataset, train_batch_size, True)
-    test_iter = DataLoader(test_dataset, test_batch_size, True)
+    train_iter = DataLoader(train_dataset, train_batch_size, True, drop_last=False)
+    test_iter = DataLoader(test_dataset, test_batch_size, True, drop_last=False)
     train_loss = []
     eval_loss = []
     train_acc = []

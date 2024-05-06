@@ -9,7 +9,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import Trainer, TrainingArguments, BertTokenizer, BertForMaskedLM
 from utils import read_dataset_prompt
+import torch
 
+
+torch.cuda.empty_cache()
 
 LOG_FILENAME = config.log_dir + "Prompt_" + str(int(time.time())) + ".log"
 print(30 * "=",

@@ -515,9 +515,10 @@ def read_dataset_prompt(path, max_length):
             # prompt
             text = content + '。上文中，项目是' + '[MASK]'*len(project) + '，图名是' + '[MASK]'*len(drawing) + '，设计是' + '[MASK]'*len(design) + '，复核是' + '[MASK]'*len(recheck) + '，审核是' + '[MASK]'*len(check) + '，图号是' + '[MASK]'*len(num) + '，表格是' + '[MASK]'*len(sheet) + '，图示是' + '[MASK]'*len(sketch)
             label = content + '。上文中，项目是' + ''.join(project) + '，图名是' + ''.join(drawing) + '，设计是' + ''.join(design) + '，复核是' + ''.join(recheck) + '，审核是' + ''.join(check) + '，图号是' + ''.join(num) + '，表格是' + ''.join(sheet) + '，图示是' + ''.join(sketch)
-            if len(content) > max_length:
-                content = content[-(max_length - 2):]
-                label = label[-(max_length - 2):]
+            # text = content + '。上文中，' + '[MASK]'*len(project) + '是项目，' + '[MASK]'*len(drawing) + '是图名，' + '[MASK]'*len(design) + '是设计，' + '[MASK]'*len(recheck) + '是复核，' + '[MASK]'*len(check) + '是审核。'
+            # label = content + '。上文中，' + ''.join(project) + '是项目，' + ''.join(drawing) + '是图名，' + ''.join(design) + '是设计，' + ''.join(recheck) + '是复核，' + ''.join(check) + '是审核。'
+            content = content[-(max_length - 2):]
+            label = label[-(max_length - 2):]
             texts.append(text)
             labels.append(label)
     return texts, labels
