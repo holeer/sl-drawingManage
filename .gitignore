@@ -1,9 +1,0 @@
-dataset/
-snapshot/
-model/
-VOCdevkit/
-output/
-temp/
-log/
-__pycache__/
-config/__pycache__/
